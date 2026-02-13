@@ -8,6 +8,11 @@ X（旧Twitter）のテーマカラーを自由に変更できるChrome拡張機
 - カラーピッカーで直感的な色選択
 - リアルタイムでテーマを反映
 
+
+https://github.com/user-attachments/assets/0599ec97-3de6-4308-ae79-ae969d56c79b
+
+
+
 ## インストール
 
 1. リポジトリをクローン
