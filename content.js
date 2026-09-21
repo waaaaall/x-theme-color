@@ -67,12 +67,17 @@ function buildCssTemplate(theme) {
   const txt = rgbCss(theme.text);
   return `
 /* 選択色ベースのカラーテーマ */
-body, .r-kemksi {
+html,
+body,
+#react-root,
+.r-kemksi {
   background-color: ${bg} !important;
 }
+
 .r-5zmot {
-  background-color: rgb(${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]}, 0.65) !important;
+  background-color: rgba(${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]}, 0.65) !important;
 }
+
 .r-1kqtdi0, .r-1roi411 {
   border-color: ${bord} !important;
 }
@@ -86,27 +91,37 @@ body, .r-kemksi {
   color: ${txt} !important;
 }
 
+/* メインコンテンツ・ヘッダー・タブバーの背景 */
 body,
+main[role="main"],
 [data-testid="primaryColumn"],
+[data-testid="sidebarColumn"],
 [data-testid="pill-contents-container"] > div,
 [role="menu"],
+header[role="banner"],
 :has(
   [data-testid="app-bar-back"],
   [data-testid="ScrollSnap-prevButtonWrapper"],
-  [aria-label^="タイムライン"],
-  [aria-label^="検索"],
-  [aria-label^="プレミアム"],
-  [aria-label^="おすすめ"],
-  [aria-label^="スペース"]
+  [aria-label*="タイムライン"],
+  [aria-label*="Timeline"],
+  [aria-label*="検索"],
+  [aria-label*="Search"],
+  [aria-label*="プレミアム"],
+  [aria-label*="Premium"],
+  [aria-label*="おすすめ"],
+  [aria-label*="For you"],
+  [aria-label*="フォロー中"],
+  [aria-label*="Following"],
+  [aria-label*="スペース"],
+  [aria-label*="Spaces"]
 ){
   background-color: ${bg} !important;
 }
 
-:has(
-  > div > [data-icon="icon-messages-stroke"],
-  > div > [data-testid="GrokDrawerHeader"]
-),
-svg[aria-label="認証済みアカウント"]{
+/* Grok 関連の非表示 */
+:has(> div > [data-testid="GrokDrawerHeader"]),
+[data-testid="GrokDrawer"],
+[aria-label="Grok"] {
   display: none !important;
 }
 `.trim();
@@ -129,9 +144,16 @@ function upsertStyle(cssText) {
   if (!style) {
     style = document.createElement("style");
     style.id = STYLE_ID;
-    (document.head || document.documentElement).appendChild(style);
   }
   style.textContent = cssText;
+
+  const target = document.head || document.documentElement;
+  if (target) {
+    // スタイルシートが常に最優先されるよう末尾に配置
+    if (style.parentNode !== target || target.lastElementChild !== style) {
+      target.appendChild(style);
+    }
+  }
 }
 
 const storage = chrome.storage.local;
@@ -148,26 +170,41 @@ async function applyFromStorage() {
   upsertStyle(css);
 }
 
-function run() {
-  applyFromStorage();
-}
+// 起動時適用
+applyFromStorage();
 
-run();
+// ポップアップからの即時通知を受け取りリアルタイム反映
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === "X_THEME_UPDATE" && msg.data) {
+    const css = buildCss(msg.data);
+    upsertStyle(css);
+  }
+});
 
+// ストレージ変更の同期（別タブ等からの変更用）
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
   applyFromStorage();
-});
-
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "X_THEME_REFRESH") applyFromStorage();
 });
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") applyFromStorage();
 });
 
-const observer = new MutationObserver(() => {
-  if (!document.getElementById(STYLE_ID)) run();
-});
-observer.observe(document.documentElement, { childList: true, subtree: true });
+// 軽量な MutationObserver: スタイル要素が外れたり末尾から外れた場合に復元
+function setupObserver() {
+  const target = document.head || document.documentElement;
+  if (!target) {
+    document.addEventListener("DOMContentLoaded", setupObserver, { once: true });
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    const style = document.getElementById(STYLE_ID);
+    if (!style) {
+      applyFromStorage();
+    }
+  });
+  observer.observe(target, { childList: true });
+}
+
+setupObserver();
