@@ -98,6 +98,13 @@ header[role="banner"],
 ){
   background-color: ${bg} !important;
 }
+
+/* Grok 関連の非表示 */
+:has(> div > [data-testid="GrokDrawerHeader"]),
+[data-testid="GrokDrawer"],
+[aria-label="Grok"] {
+  display: none !important;
+}
 `.trim();
 }
 
