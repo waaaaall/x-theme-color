@@ -71,7 +71,7 @@ body, .r-kemksi {
   background-color: ${bg} !important;
 }
 .r-5zmot {
-  background-color: rgb(${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]}, 0.65) !important;
+  background-color: rgba(${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]}, 0.65) !important;
 }
 .r-1kqtdi0, .r-1roi411 {
   border-color: ${bord} !important;
@@ -88,26 +88,15 @@ body, .r-kemksi {
 
 body,
 [data-testid="primaryColumn"],
+[data-testid="sidebarColumn"],
 [data-testid="pill-contents-container"] > div,
 [role="menu"],
+header[role="banner"],
 :has(
   [data-testid="app-bar-back"],
-  [data-testid="ScrollSnap-prevButtonWrapper"],
-  [aria-label^="タイムライン"],
-  [aria-label^="検索"],
-  [aria-label^="プレミアム"],
-  [aria-label^="おすすめ"],
-  [aria-label^="スペース"]
+  [data-testid="ScrollSnap-prevButtonWrapper"]
 ){
   background-color: ${bg} !important;
-}
-
-:has(
-  > div > [data-icon="icon-messages-stroke"],
-  > div > [data-testid="GrokDrawerHeader"]
-),
-svg[aria-label="認証済みアカウント"]{
-  display: none !important;
 }
 `.trim();
 }
@@ -129,9 +118,17 @@ function upsertStyle(cssText) {
   if (!style) {
     style = document.createElement("style");
     style.id = STYLE_ID;
-    (document.head || document.documentElement).appendChild(style);
+    const target = document.head || document.documentElement;
+    if (target) {
+      target.appendChild(style);
+    }
   }
   style.textContent = cssText;
+
+  // head が後から利用可能になった場合、head 内に移動
+  if (document.head && style.parentNode !== document.head) {
+    document.head.appendChild(style);
+  }
 }
 
 const storage = chrome.storage.local;
@@ -148,26 +145,29 @@ async function applyFromStorage() {
   upsertStyle(css);
 }
 
-function run() {
-  applyFromStorage();
-}
-
-run();
+applyFromStorage();
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
   applyFromStorage();
 });
 
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "X_THEME_REFRESH") applyFromStorage();
-});
-
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") applyFromStorage();
 });
 
-const observer = new MutationObserver(() => {
-  if (!document.getElementById(STYLE_ID)) run();
-});
-observer.observe(document.documentElement, { childList: true, subtree: true });
+// 軽量な MutationObserver: head 直下の要素変更のみを監視してスタイルの消失を防止
+function setupObserver() {
+  if (!document.head) {
+    document.addEventListener("DOMContentLoaded", setupObserver, { once: true });
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    if (!document.getElementById(STYLE_ID)) {
+      applyFromStorage();
+    }
+  });
+  observer.observe(document.head, { childList: true });
+}
+
+setupObserver();
