@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "X Theme Color Changer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Change X(Twitter) accent color freely.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "activeTab"],
   "host_permissions": ["*://*.twitter.com/*", "*://*.x.com/*"],
   "action": {
     "default_title": "X Theme Color",

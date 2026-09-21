@@ -67,12 +67,17 @@ function buildCssTemplate(theme) {
   const txt = rgbCss(theme.text);
   return `
 /* 選択色ベースのカラーテーマ */
-body, .r-kemksi {
+html,
+body,
+#react-root,
+.r-kemksi {
   background-color: ${bg} !important;
 }
+
 .r-5zmot {
   background-color: rgba(${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]}, 0.65) !important;
 }
+
 .r-1kqtdi0, .r-1roi411 {
   border-color: ${bord} !important;
 }
@@ -86,7 +91,9 @@ body, .r-kemksi {
   color: ${txt} !important;
 }
 
+/* メインコンテンツ・ヘッダー・タブバーの背景 */
 body,
+main[role="main"],
 [data-testid="primaryColumn"],
 [data-testid="sidebarColumn"],
 [data-testid="pill-contents-container"] > div,
@@ -94,7 +101,19 @@ body,
 header[role="banner"],
 :has(
   [data-testid="app-bar-back"],
-  [data-testid="ScrollSnap-prevButtonWrapper"]
+  [data-testid="ScrollSnap-prevButtonWrapper"],
+  [aria-label*="タイムライン"],
+  [aria-label*="Timeline"],
+  [aria-label*="検索"],
+  [aria-label*="Search"],
+  [aria-label*="プレミアム"],
+  [aria-label*="Premium"],
+  [aria-label*="おすすめ"],
+  [aria-label*="For you"],
+  [aria-label*="フォロー中"],
+  [aria-label*="Following"],
+  [aria-label*="スペース"],
+  [aria-label*="Spaces"]
 ){
   background-color: ${bg} !important;
 }
@@ -125,16 +144,15 @@ function upsertStyle(cssText) {
   if (!style) {
     style = document.createElement("style");
     style.id = STYLE_ID;
-    const target = document.head || document.documentElement;
-    if (target) {
-      target.appendChild(style);
-    }
   }
   style.textContent = cssText;
 
-  // head が後から利用可能になった場合、head 内に移動
-  if (document.head && style.parentNode !== document.head) {
-    document.head.appendChild(style);
+  const target = document.head || document.documentElement;
+  if (target) {
+    // スタイルシートが常に最優先されるよう末尾に配置
+    if (style.parentNode !== target || target.lastElementChild !== style) {
+      target.appendChild(style);
+    }
   }
 }
 
@@ -152,8 +170,18 @@ async function applyFromStorage() {
   upsertStyle(css);
 }
 
+// 起動時適用
 applyFromStorage();
 
+// ポップアップからの即時通知を受け取りリアルタイム反映
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === "X_THEME_UPDATE" && msg.data) {
+    const css = buildCss(msg.data);
+    upsertStyle(css);
+  }
+});
+
+// ストレージ変更の同期（別タブ等からの変更用）
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
   applyFromStorage();
@@ -163,18 +191,20 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") applyFromStorage();
 });
 
-// 軽量な MutationObserver: head 直下の要素変更のみを監視してスタイルの消失を防止
+// 軽量な MutationObserver: スタイル要素が外れたり末尾から外れた場合に復元
 function setupObserver() {
-  if (!document.head) {
+  const target = document.head || document.documentElement;
+  if (!target) {
     document.addEventListener("DOMContentLoaded", setupObserver, { once: true });
     return;
   }
   const observer = new MutationObserver(() => {
-    if (!document.getElementById(STYLE_ID)) {
+    const style = document.getElementById(STYLE_ID);
+    if (!style) {
       applyFromStorage();
     }
   });
-  observer.observe(document.head, { childList: true });
+  observer.observe(target, { childList: true });
 }
 
 setupObserver();
